@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Robot Drag & Drop Game</title>
+
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #f0f0f0;
+    touch-action: none;
+}
+
+#levelText {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+#bowl {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle at center, #ddd 40%, #aaa 100%);
+    border-radius: 50%;
+    border: 5px solid #888;
+}
+
+.robot {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    cursor: grab;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.eyes {
+    display: flex;
+    gap: 8px;
+    animation: blink 4s infinite;
+}
+
+.eye {
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 50%;
+}
+
+@keyframes blink {
+    0%, 96%, 100% { transform: scaleY(1); }
+    98% { transform: scaleY(0.1); }
+}
+
+#pigScreen {
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+    background: pink;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    font-size: 100px;
+    z-index: 5000;
+}
+
+#secretImage {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    background: black;
+    z-index: 9999;
+}
+</style>
+</head>
+
+<body>
+
+<div id="levelText">Level 1</div>
+<div id="bowl"></div>
+<div id="pigScreen">🐷</div>
+<img id="secretImage" src="secret.png">
+
+<script>
+let currentLevel = 1;
+let robotsRemaining = 15;
+let secretImage = document.getElementById("secretImage");
+
+const levelColors = {
+    1: "red",
+    2: "blue",
+    3: "green",
+    4: "purple",
+    5: "orange",
+    6: "grey",
+    7: "black"
+};
+
+function startLevel(level) {
+    robotsRemaining = 15;
+    document.getElementById("levelText").innerText = "Level " + level;
+    document.querySelectorAll(".robot").forEach(r => r.remove());
+    createRobots(levelColors[level]);
+}
+
+function createRobots(color) {
+    for (let i = 0; i < 15; i++) {
+        const robot = document.createElement("div");
+        robot.className = "robot";
+        robot.style.backgroundColor = color;
+
+        const x = Math.random() * (window.innerWidth - 200);
+        const y = Math.random() * (window.innerHeight - 200);
+
+        robot.style.left = x + "px";
+        robot.style.top = y + "px";
+        robot.dataset.startX = x;
+        robot.dataset.startY = y;
+
+        const eyes = document.createElement("div");
+        eyes.className = "eyes";
+        eyes.style.animationDelay = (Math.random() * 4) + "s";
+
+        for (let e = 0; e < 2; e++) {
+            const eye = document.createElement("div");
+            eye.className = "eye";
+            eyes.appendChild(eye);
+        }
+
+        robot.appendChild(eyes);
+        makeDraggable(robot);
+        document.body.appendChild(robot);
+    }
+}
+
+function makeDraggable(element) {
+    let offsetX, offsetY;
+
+    function move(x, y) {
+        element.style.left = (x - offsetX) + "px";
+        element.style.top = (y - offsetY) + "px";
+    }
+
+    element.addEventListener("mousedown", function(e) {
+        offsetX = e.clientX - element.offsetLeft;
+        offsetY = e.clientY - element.offsetTop;
+
+        function mouseMove(e) {
+            move(e.clientX, e.clientY);
+        }
+
+        function mouseUp() {
+            document.removeEventListener("mousemove", mouseMove);
+            document.removeEventListener("mouseup", mouseUp);
+            checkDrop(element);
+        }
+
+        document.addEventListener("mousemove", mouseMove);
+        document.addEventListener("mouseup", mouseUp);
+    });
+
+    element.addEventListener("touchstart", function(e) {
+        const touch = e.touches[0];
+        offsetX = touch.clientX - element.offsetLeft;
+        offsetY = touch.clientY - element.offsetTop;
+    });
+
+    element.addEventListener("touchmove", function(e) {
+        const touch = e.touches[0];
+        move(touch.clientX, touch.clientY);
+    });
+
+    element.addEventListener("touchend", function() {
+        checkDrop(element);
+    });
+}
+
+function checkDrop(robot) {
+    const bowl = document.getElementById("bowl");
+    const bowlRect = bowl.getBoundingClientRect();
+    const robotRect = robot.getBoundingClientRect();
+
+    const inside =
+        robotRect.left > bowlRect.left &&
+        robotRect.right < bowlRect.right &&
+        robotRect.top > bowlRect.top &&
+        robotRect.bottom < bowlRect.bottom;
+
+    if (inside) {
+        robot.style.left = bowlRect.left + 40 + "px";
+        robot.style.top = bowlRect.top + 40 + "px";
+        robot.style.pointerEvents = "none";
+        robotsRemaining--;
+        checkLevelComplete();
+    } else {
+        robot.style.left = robot.dataset.startX + "px";
+        robot.style.top = robot.dataset.startY + "px";
+    }
+}
+
+function checkLevelComplete() {
+    if (robotsRemaining === 0) {
+        currentLevel++;
+        if (currentLevel > 7) {
+            showPig();
+        } else {
+            startLevel(currentLevel);
+        }
+    }
+}
+
+function showPig() {
+    document.querySelectorAll(".robot").forEach(r => r.remove());
+    document.getElementById("levelText").style.display = "none";
+    document.getElementById("bowl").style.display = "none";
+    document.getElementById("pigScreen").style.display = "flex";
+}
+
+/* Desktop Secret: M + R + Z */
+let pressedKeys = new Set();
+
+document.addEventListener("keydown", function(e) {
+    pressedKeys.add(e.key.toLowerCase());
+    if (pressedKeys.has("m") && pressedKeys.has("r") && pressedKeys.has("z")) {
+        secretImage.style.display = "block";
+    }
+});
+
+document.addEventListener("keyup", function(e) {
+    pressedKeys.delete(e.key.toLowerCase());
+    if (!(pressedKeys.has("m") && pressedKeys.has("r") && pressedKeys.has("z"))) {
+        secretImage.style.display = "none";
+    }
+});
+
+/* Mobile Secret: 3-Finger Hold */
+document.addEventListener("touchstart", function(e) {
+    if (e.touches.length === 3) {
+        secretImage.style.display = "block";
+    }
+});
+
+document.addEventListener("touchend", function(e) {
+    if (e.touches.length < 3) {
+        secretImage.style.display = "none";
+    }
+});
+
+document.addEventListener("touchcancel", function() {
+    secretImage.style.display = "none";
+});
+
+startLevel(currentLevel);
+</script>
+
+</body>
+</html>
